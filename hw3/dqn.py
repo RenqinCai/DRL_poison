@@ -99,14 +99,18 @@ class QLearner(object):
     # BUILD MODEL #
     ###############
 
-    if len(self.env.observation_space.shape) == 1:
+    observation = self.env.observation_space
+    print(observation.shape)
+  
+    if len(observation.shape) == 1:
         # This means we are running on low-dimensional observations (e.g. RAM)
-        in_features = self.env.observation_space.shape[0]
+        in_features = observation.shape[0]
     else:
-        img_h, img_w, img_c = self.env.observation_space.shape
+        img_h, img_w, img_c = observation.shape
         in_features = frame_history_len * img_c
     self.num_actions = self.env.action_space.n
-
+    
+    print("in features", in_features)
     # define deep Q network and target Q network
     self.q_net = q_func(in_features, self.num_actions).to(self.device)
     self.target_q_net = q_func(in_features, self.num_actions).to(self.device)
@@ -223,7 +227,10 @@ class QLearner(object):
 
     # YOUR CODE HERE
     idx = self.replay_buffer.store_frame(self.last_obs)
+    # print()
     ts_obs = torch.from_numpy(self.replay_buffer.encode_recent_observation()[None]).to(self.device)
+
+    # print("ts_obs", ts_obs.size())
 
     if not self.model_initialized or (random.random() < self.exploration.value(self.t)):
       action = random.randint(0, self.num_actions - 1)
@@ -243,7 +250,6 @@ class QLearner(object):
     # note that this is only done if the replay buffer contains enough samples
     # for us to learn something useful -- until then, the model will not be
     # initialized and random actions should be taken
-    self.lr_scheduler.step()
     
     if (self.t > self.learning_starts and \
         self.t % self.learning_freq == 0 and \
@@ -285,6 +291,7 @@ class QLearner(object):
       if self.num_param_updates % self.target_update_freq == 0:
         self.update_target_fn()
 
+    self.lr_scheduler.step()
     self.t += 1
 
   def log_progress(self):

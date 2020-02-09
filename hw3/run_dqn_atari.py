@@ -9,7 +9,7 @@ import numpy as np
 import torch
 from torch import nn
 
-import dqn
+import poison_dqn
 from dqn_utils import PiecewiseSchedule, get_wrapper_by_name
 from atari_wrappers import wrap_deepmind
 
@@ -23,28 +23,33 @@ class DQN(nn.Module): # for atari
     def __init__(self, in_channels, num_actions):
         # as described in https://storage.googleapis.com/deepmind-data/assets/papers/DeepMindNature14236Paper.pdf
         super(DQN, self).__init__()
+        print("in_channels", in_channels)
         self.convnet = nn.Sequential(
             nn.Conv2d(in_channels, out_channels=32, kernel_size=8, stride=4),
-            nn.ReLU(True),
+            nn.Softplus(),
             nn.Conv2d(in_channels=32, out_channels=64, kernel_size=4, stride=2),
-            nn.ReLU(True),
+            nn.Softplus(),
             nn.Conv2d(in_channels=64, out_channels=64, kernel_size=3, stride=1),
-            nn.ReLU(True),
+            nn.Softplus(),
         )
         self.classifier = nn.Sequential(
             nn.Linear(in_features=7 * 7 * 64, out_features=512),
-            nn.ReLU(True),
+            nn.Softplus(),
             nn.Linear(in_features=512, out_features=num_actions),
         )
 
         self.apply(weights_init)
         
-
     def forward(self, obs):
+        
+        # print("obs size", obs.size())
+
         out = obs.float() / 255 # convert 8-bits RGB color to float in [0, 1]
         out = out.permute(0, 3, 1, 2) # reshape to [batch_size, img_c * frames, img_h, img_w]
+
         out = self.convnet(out)
         out = out.view(out.size(0), -1) # flatten feature maps to a big vector
+        # print("out size", out.size())
         out = self.classifier(out)
         return out
 
@@ -64,7 +69,7 @@ def atari_learn(env,
     )
     lr_lambda = lambda t: lr_schedule.value(t)
 
-    optimizer = dqn.OptimizerSpec(
+    optimizer = poison_dqn.OptimizerSpec(
         constructor=torch.optim.Adam,
         kwargs=dict(eps=1e-4),
         lr_lambda=lr_lambda
@@ -84,10 +89,13 @@ def atari_learn(env,
         outside_value=0.01
     )
 
-    dqn.learn(
+    model_input_dir = "./data/dqn_Pong_double_dqn_PongNoFrameskip-v4_04-02-2020_17-14-18/2333/"
+
+    poison_dqn.learn(
         env=env,
         q_func=DQN,
         optimizer_spec=optimizer,
+        model_input_dir=model_input_dir, 
         exploration=exploration_schedule,
         stopping_criterion=stopping_criterion,
         replay_buffer_size=1000000,
@@ -126,6 +134,8 @@ def get_env(env_name, exp_name, seed):
     expt_dir = '/tmp/hw3_vid_dir2/'
     env = wrappers.Monitor(env, osp.join(expt_dir, "gym"), force=True)
     env = wrap_deepmind(env)
+    # observation = env.reset()
+    # print('observation shape', observation.shape)
 
     return env
 

@@ -79,6 +79,11 @@ def save_pytorch_model(model):
     """
     torch.save(model, osp.join(G.output_dir, "model.pkl"))
     
+def load_model(model, model_input_dir):
+    PATH = osp.join(model_input_dir, "model.pkl")
+    # model.load_state_dict(torch.load(PATH))
+    model = torch.load(PATH)
+    print('model loaded.')
 
 def dump_tabular():
     """
